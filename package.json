@@ -3,13 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
+    "dev": "prisma generate && tsx prisma/init-db.ts && next dev",
+    "build": "prisma generate && tsx prisma/init-db.ts && next build",
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "seed": "tsx prisma/seed.ts"
+  },
+  "allowScripts": {
+    "@prisma/client": true,
+    "@prisma/engines": true,
+    "prisma": true,
+    "esbuild": true
   },
   "dependencies": {
     "@prisma/client": "^5.21.1",
