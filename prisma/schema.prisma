@@ -1,0 +1,172 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String   @id @default(uuid())
+  name             String
+  email            String   @unique
+  passwordHash     String
+  role             String   @default("STUDENT") // STUDENT, ORGANIZER, ADMIN
+  enrollmentNumber String?  @unique
+  course           String?
+  department       String?
+  semester         String?
+  phone            String?
+  avatarUrl        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  organizedEvents Event[]        @relation("OrganizerEvents")
+  registrations   Registration[]
+  attendance      Attendance[]   @relation("StudentAttendance")
+  markedAttendance Attendance[]  @relation("MarkedByOrganizer")
+  certificates    Certificate[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  school      String
+  description String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  events Event[]
+
+  @@map("departments")
+}
+
+model Event {
+  id                   String   @id @default(uuid())
+  title                String
+  description          String
+  category             String   // Academic, Technical, Cultural, Sports, Student Activities
+  subCategory          String?  // Seminars, Hackathons, Music, Cricket, etc.
+  departmentId         String
+  organizerId          String
+  venue                String
+  eventDate            String   // YYYY-MM-DD
+  startTime            String   // HH:MM AM/PM
+  endTime              String   // HH:MM AM/PM
+  registrationDeadline String   // YYYY-MM-DD
+  maxParticipants      Int      @default(100)
+  eligibility          String?  @default("Open to all DHSGSU students")
+  rules                String?  // Formatted JSON string or newline list of rules
+  speakerGuest         String?
+  contactPerson        String?
+  contactPhone         String?
+  requiredDocuments    String?
+  posterUrl            String?
+  status               String   @default("PUBLISHED") // DRAFT, PENDING_APPROVAL, PUBLISHED, REGISTRATION_CLOSED, COMPLETED, CANCELLED
+  isFeatured           Boolean  @default(false)
+  isPast               Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // Relations
+  department    Department     @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  organizer     User           @relation("OrganizerEvents", fields: [organizerId], references: [id], onDelete: Cascade)
+  registrations Registration[]
+  attendance    Attendance[]
+  certificates  Certificate[]
+
+  @@map("events")
+}
+
+model Registration {
+  id             String   @id @default(uuid())
+  eventId        String
+  studentId      String
+  registrationId String   @unique // e.g., DHSGSU-EVT-2026-0001
+  qrCode         String   // Text or data URL payload
+  status         String   @default("CONFIRMED") // CONFIRMED, CANCELLED, WAITLISTED
+  registeredAt   DateTime @default(now())
+
+  // Event specific fields (optional notes, team name, etc.)
+  notes          String?
+
+  // Relations
+  event      Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student    User         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  attendance Attendance[]
+
+  @@unique([eventId, studentId])
+  @@map("registrations")
+}
+
+model Attendance {
+  id             String   @id @default(uuid())
+  eventId        String
+  studentId      String
+  registrationId String
+  checkInTime    DateTime @default(now())
+  status         String   @default("PRESENT") // PRESENT, LATE, EXCUSED
+  markedBy       String   // Organizer User ID
+
+  // Relations
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student      User         @relation("StudentAttendance", fields: [studentId], references: [id], onDelete: Cascade)
+  registration Registration @relation(fields: [registrationId], references: [registrationId], onDelete: Cascade)
+  marker       User         @relation("MarkedByOrganizer", fields: [markedBy], references: [id])
+
+  @@unique([eventId, studentId])
+  @@map("attendance")
+}
+
+model Certificate {
+  id             String   @id @default(uuid())
+  eventId        String
+  studentId      String
+  certificateId  String   @unique // e.g., DHSGSU-CERT-2026-0001
+  certificateUrl String?
+  issuedAt       DateTime @default(now())
+
+  // Relations
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student User  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, studentId])
+  @@map("certificates")
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  userId     String
+  title      String
+  message    String
+  type       String   @default("INFO") // INFO, SUCCESS, WARNING, ALERT
+  readStatus Boolean  @default(false)
+  link       String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  details   String?
+  timestamp DateTime @default(now())
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
